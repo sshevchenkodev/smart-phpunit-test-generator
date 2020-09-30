@@ -1,0 +1,1 @@
+# smart-phpunit-test-generator
