@@ -1,0 +1,27 @@
+{
+    "name": "sshevchenkodev/smart-phpunit-test-generator",
+    "type": "library",
+    "description": "Library for generating a PHP test",
+    "keywords": [
+        "php",
+        "phpunit"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Stanislav Shevchenko"
+        }
+    ],
+    "require": {
+        "php": ">=7.1",
+        "nikic/php-parser": "^4.10"
+    },
+    "bin": [
+        "bin/smart-php-test-gen"
+    ],
+    "autoload": {
+        "psr-4": {
+            "SmartPHPUnitGenerator\\": "src"
+        }
+    }
+}
