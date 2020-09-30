@@ -14,7 +14,7 @@
     ],
     "require": {
         "php": ">=7.1",
-        "nikic/php-parser": "^4.10"
+        "nikic/php-parser": "^4.3"
     },
     "bin": [
         "bin/smart-php-test-gen"
