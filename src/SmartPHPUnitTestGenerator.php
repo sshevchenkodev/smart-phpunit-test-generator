@@ -48,16 +48,34 @@ class SmartPHPUnitTestGenerator
     public function generate(string $class, string $testDirPath): void
     {
         $reflector = new \ReflectionClass($class);
-        $file = new \SplFileObject($reflector->getFileName(), 'rb');
-        if (!$file->isReadable()) {
-            throw new \RuntimeException('wdq');
-        }
-        $code = $file->fread($file->getSize());
+        $code = $this->getSourceCode($reflector->getFileName());
 
         $ast = $this->parserFactory->create(ParserFactory::PREFER_PHP7)->parse($code);
         $paramToPropertyMap = $this->dependencyPropertyMapper->map($reflector, $ast);
-        dd($paramToPropertyMap);
         $dependencyCollection = $this->dependencyFetcher->fetch($ast, $paramToPropertyMap);
         $resultCode = $this->unitTestClassRenderer->render($reflector, $dependencyCollection, $paramToPropertyMap);
+
+        file_put_contents(
+            $testDirPath . '/' . $reflector->getShortName() . 'Test.php',
+            $resultCode
+        );
+
+        echo $resultCode . PHP_EOL . PHP_EOL;
+        echo $reflector->getShortName() . 'Test.php' . ' was successfuly generated!' . PHP_EOL;
+    }
+
+    /**
+     * @param string $file
+     *
+     * @return string
+     */
+    private function getSourceCode(string $fileName): string
+    {
+        $file = new \SplFileObject($fileName, 'rb');
+        if (!$file->isReadable()) {
+            throw new \RuntimeException(sprintf('Can not read file %s', $fileName));
+        }
+
+        return $file->fread($file->getSize());
     }
 }

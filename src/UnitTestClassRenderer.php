@@ -11,6 +11,7 @@ use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\Declare_;
 use PhpParser\Node\Stmt\DeclareDeclare;
 use PhpParser\PrettyPrinter\Standard;
+use PHPUnit\Framework\TestCase;
 
 class UnitTestClassRenderer
 {
@@ -36,10 +37,14 @@ class UnitTestClassRenderer
      * @param \ReflectionClass $reflectionClass
      * @param array $dependencyCollection
      * @param array $paramToPropertyMap
+     *
      * @return string
      */
-    public function render(\ReflectionClass $reflectionClass, array $dependencyCollection, array $paramToPropertyMap): string
-    {
+    public function render(
+        \ReflectionClass $reflectionClass,
+        array $dependencyCollection,
+        array $paramToPropertyMap
+    ): string {
         $className = sprintf('%sTest', $reflectionClass->getShortName());
         // FIXME path
         $namespace = sprintf('Tests\Unit\%s', $reflectionClass->getNamespaceName());
@@ -58,8 +63,8 @@ class UnitTestClassRenderer
              *
              * Example:
              *
-             *  $mockWithoutCallMethod = $this->createMock('SomeDependency');
-             *  $mockWithCallMethod = $this->createMock('UserApiProviderInterface');
+             *  $mockWithoutCallMethod = $this->createMock('SomeDependency'); //not used
+             *  $mockWithCallMethod = $this->createMock('UserApiProviderInterface'); //not used
              *  $mockWithCallMethod->expects($this->once())->method('methodName')->willReturn('someResult');
              *
              *  $service = new Service($mockWithoutCallMethod, $mockWithCallMethod);
@@ -85,8 +90,8 @@ class UnitTestClassRenderer
 
                 $testMethod->addStmt(new Assign($mock, $createMock));
 
-                foreach ($attributes['methods'] as $method => $callCount) {
-                    if ($callCount > 1) {
+                foreach ($attributes['methods'] as $method => $params) {
+                    if (count($params['args']) > 1) {
                         //TODO
                         continue;
                     }
@@ -145,7 +150,7 @@ class UnitTestClassRenderer
         return $this->builderFactory->methodCall(
             $this->builderFactory->var('this'),
             'createMock',
-            [$className]
+            [$this->builderFactory->classConstFetch($className, 'class')]
         );
     }
 

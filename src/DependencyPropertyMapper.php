@@ -40,9 +40,8 @@ class DependencyPropertyMapper
             $paramNameToInjectedDependencyTypeMap[$parameter->getName()] = (string)$parameter->getType();
         }
 
-        $constructor = $this->nodeFinder->findFirst($ast, function (Node $node) {
-            return $node instanceof ClassMethod && $node->name->toString() === '__construct';
-        });
+        $constructor = $this->getConstructMethod($ast);
+
         /** @var Assign[] $assignExpressions */
         $assignExpressions = $this->nodeFinder->findInstanceOf($constructor, Assign::class);
         
@@ -53,5 +52,23 @@ class DependencyPropertyMapper
         }
 
         return $paramToPropertyMap;
+    }
+
+    /**
+     * @param array $ast
+     *
+     * @return ClassMethod
+     */
+    private function getConstructMethod(array $ast): ClassMethod
+    {
+        $constructor = $this->nodeFinder->findFirst($ast, function (Node $node) {
+            return $node instanceof ClassMethod && $node->name->toString() === '__construct';
+        });
+
+        if ($constructor === null) {
+            throw new \RuntimeException('Construct method not found');
+        }
+
+        return $constructor;
     }
 }
