@@ -3,7 +3,14 @@
 
 declare(strict_types=1);
 
+use PhpParser\BuilderFactory;
+use PhpParser\NodeFinder;
+use PhpParser\ParserFactory;
+use PhpParser\PrettyPrinter\Standard;
+use SmartPHPUnitGenerator\DependencyFetcher;
+use SmartPHPUnitGenerator\DependencyPropertyMapper;
 use SmartPHPUnitGenerator\SmartPHPUnitTestGenerator;
+use SmartPHPUnitGenerator\UnitTestClassRenderer;
 
 $autoloadFiles = [
     getcwd() . '/vendor/autoload.php',
@@ -11,16 +18,21 @@ $autoloadFiles = [
     __DIR__ . '/../../../autoload.php',
 ];
 
-$autoloaderFound = false;
-
 foreach ($autoloadFiles as $autoloadFile) {
-    if (! file_exists($autoloadFile)) {
-        continue;
+    if (file_exists($autoloadFile)) {
+        require_once $autoloadFile;
     }
-
-    require_once $autoloadFile;
-
-    $autoloaderFound = true;
 }
 
-(new SmartPHPUnitTestGenerator())->generate();
+$nodeFinder = new NodeFinder();
+$dependencyPropertyMapper = new DependencyPropertyMapper($nodeFinder);
+$dependencyFetcher = new DependencyFetcher($nodeFinder);
+$unitTestClassRenderer = new UnitTestClassRenderer(new BuilderFactory(), new Standard());
+$parserFactory = new ParserFactory();
+
+(new SmartPHPUnitTestGenerator(
+    $dependencyPropertyMapper,
+    $dependencyFetcher,
+    $unitTestClassRenderer,
+    $parserFactory
+))->generate($argv[1], $argv[2]);
