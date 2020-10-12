@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SmartPHPUnitGenerator;
+namespace SmartPHPUnitTestGenerator;
 
 use PhpParser\Node;
 use PhpParser\Node\Expr\Assign;
+use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 
@@ -25,7 +26,7 @@ class DependencyPropertyMapper
     }
 
     /**
-     * Calculate mapping between dependency parameters and assigned to class properties @todo check gramar!!!!
+     * Calculate mapping between dependency parameters and assigned to class properties
      *
      * @param \ReflectionClass $reflectionClass
      * @param Stmt[]           $ast
@@ -34,10 +35,10 @@ class DependencyPropertyMapper
      */
     public function map(\ReflectionClass $reflectionClass, array $ast): array
     {
-        // "someServiceParam" => "App\Service\SomeService"
         $paramNameToInjectedDependencyTypeMap = [];
         foreach ($reflectionClass->getConstructor()->getParameters() as $parameter) {
-            $paramNameToInjectedDependencyTypeMap[$parameter->getName()] = (string)$parameter->getType();
+            // FIXME if param not object
+            $paramNameToInjectedDependencyTypeMap[$parameter->getName()] = $parameter->getClass();
         }
 
         $constructor = $this->getConstructMethod($ast);
@@ -61,6 +62,7 @@ class DependencyPropertyMapper
      */
     private function getConstructMethod(array $ast): ClassMethod
     {
+        /** @var ClassMethod $constructor */
         $constructor = $this->nodeFinder->findFirst($ast, function (Node $node) {
             return $node instanceof ClassMethod && $node->name->toString() === '__construct';
         });

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SmartPHPUnitGenerator;
+namespace SmartPHPUnitTestGenerator;
 
 use PhpParser\ParserFactory;
 
@@ -42,12 +42,23 @@ class SmartPHPUnitTestGenerator
 
     /**
      * @param string $class
-     *
      * @param string $testDirPath
+     * @param bool   $rewrite
      */
-    public function generate(string $class, string $testDirPath): void
+    public function generate(string $class, string $testDirPath, bool $rewrite = false): void
     {
         $reflector = new \ReflectionClass($class);
+        $file = sprintf('%s/%sTest.php', $testDirPath, $reflector->getShortName());
+
+        if (file_exists($file) && !$rewrite) {
+             exit(sprintf(
+                'File %s already exists. Execute smart-php-test-gen %s %s --rewrite' . PHP_EOL,
+                $file,
+                $class,
+                $testDirPath
+            ));
+        }
+
         $code = $this->getSourceCode($reflector->getFileName());
 
         $ast = $this->parserFactory->create(ParserFactory::PREFER_PHP7)->parse($code);
@@ -55,19 +66,19 @@ class SmartPHPUnitTestGenerator
         $dependencyCollection = $this->dependencyFetcher->fetch($ast, $paramToPropertyMap);
         $resultCode = $this->unitTestClassRenderer->render($reflector, $dependencyCollection, $paramToPropertyMap);
 
-        file_put_contents(
-            $testDirPath . '/' . $reflector->getShortName() . 'Test.php',
-            $resultCode
-        );
+        file_put_contents($file, $resultCode);
 
         echo $resultCode . PHP_EOL . PHP_EOL;
-        echo $reflector->getShortName() . 'Test.php' . ' was successfuly generated!' . PHP_EOL;
+
+        echo sprintf('The file %sTest.php was created successfully!', $reflector->getShortName()) . PHP_EOL;
     }
 
     /**
-     * @param string $file
+     * @param string $fileName
      *
      * @return string
+     *
+     * @throws \RuntimeException If the file is not readable
      */
     private function getSourceCode(string $fileName): string
     {

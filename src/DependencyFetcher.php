@@ -2,14 +2,16 @@
 
 declare(strict_types=1);
 
-namespace SmartPHPUnitGenerator;
+namespace SmartPHPUnitTestGenerator;
 
 use PhpParser\Node;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Expr\PropertyFetch;
+use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
+use SmartPHPUnitTestGenerator\Util\ReturnTypeChecker;
 
 class DependencyFetcher
 {
@@ -32,65 +34,68 @@ class DependencyFetcher
      *
      * @return array
      *
-     * @FIXME update doc
-     *
      *   [
-     *      public method of source class
+     *      Public method of source class
      *      Example: UserService::updateUser()
      *      "updateUser" => [
      *
-     *           property of source class with dependency
+     *           Property of source class with dependency
      *           $this->storageService->getUserByEmail(...)
      *           $this->storageService->create(...)
      *           "storageService" => [
+     *               "className" => StorageService
      *               "type" => App\Service\StorageService
+     *               "isReturnTypeVoid" => false
      *               "methods" => [
      *                  Key: Used methods of dependency
-     *                  Value: call counter
+     *                  Value: Array of attributes
      *
-     *                  "getUserByEmail" => 2
-     *                  "create" => 1
+     *                  "getUserByEmail" => [
+     *                      "args" => []
+     *                  ]
+     *                  "create" => [
+     *                      "args" => []
+     *                  ]
      *               ]
      *           ]
      *
-     *          // The same structure
-     *          "userApiProvider" => [
-     *              "createUser" => 1
-     *          ]
-     *          "dispatcher" => [
-     *              "dispatch" => 1
-     *          ]
+     *           // The same structure
+     *           "someDependency1" => [
+     *               ...
+     *           ]
+     *           "someDependency2" => [
+     *               ...
+     *           ]
      *   ]
      */
     public function fetch(array $ast, array $paramToPropertyMap): array
     {
         // !!!! TODO REFACTOR !!!!
 
-        // make this method recurcive and remove self::getCalledDependencyByClassMethod
+        // make this method recursive and remove self::getCalledDependencyByClassMethod
 
         // $methods = $this->getPublicMethods($ast); move out of this method to SmartPHPUnitGenerator
 
         // move out of this method to SmartPHPUnitGenerator !!!!
 //        if ($method->name->toString() === '__construct') {
-//            // @todo need to configurate it via param
+//            // @todo need to configure it via param
 //            // Do not need to calculate dependency calls for constructor
 //            continue;
 //        }
 
         $dependencyCollection = [];
-        // Get all public methods of target class
         $methods = $this->getPublicMethods($ast);
 
         /** @var ClassMethod $method */
         foreach ($methods as $method) {
             if ($method->name->toString() === '__construct') {
-                // @todo need to configurate it via param
+                // @todo need to configure it via param
                 // Do not need to calculate dependency calls for constructor
                 continue;
             }
 
             $dependencyForCurrentMethod = [];
-            $collingMethods = $this->getCalledDependency($method->stmts);
+            $collingMethods = $this->getCalledDependencies($method->stmts);
 
             /** @var MethodCall $collingMethod */
             foreach ($collingMethods as $collingMethod) {
@@ -111,7 +116,12 @@ class DependencyFetcher
                 $dependency = $collingMethod->var->name->toString();
                 $dependencyMethodCall = $collingMethod->name->toString();
 
-                $dependencyForCurrentMethod[$dependency]['type'] = $paramToPropertyMap[$dependency];
+                /** @var \ReflectionClass $class */
+                $class = $paramToPropertyMap[$dependency];
+                $isReturnTypeVoid = ReturnTypeChecker::isReturnTypeVoid($class->getMethod($dependencyMethodCall));
+                $dependencyForCurrentMethod[$dependency]['className'] = $class->getShortName();
+                $dependencyForCurrentMethod[$dependency]['type'] = $class->getName();
+                $dependencyForCurrentMethod[$dependency]['isReturnTypeVoid'] = $isReturnTypeVoid;
                 $dependencyForCurrentMethod[$dependency]['methods'][$dependencyMethodCall]['args'][] = []; //@todo parse args fot $this->with(...)
             }
 
@@ -134,7 +144,7 @@ class DependencyFetcher
         $calledMethod = $this->getClassMethodNodeByName($ast, $method);
 
         $dependencyForCurrentMethod = [];
-        $collingMethods = $this->getCalledDependency($calledMethod->stmts);
+        $collingMethods = $this->getCalledDependencies($calledMethod->stmts);
 
         /** @var MethodCall $collingMethod */
         foreach ($collingMethods as $collingMethod) {
@@ -156,7 +166,11 @@ class DependencyFetcher
             $dependency = $collingMethod->var->name->toString();
             $dependencyMethodCall = $collingMethod->name->toString();
 
+            $class = new \ReflectionClass($paramToPropertyMap[$dependency]);
+            $isReturnTypeVoid = ReturnTypeChecker::isReturnTypeVoid($class->getMethod($dependencyMethodCall));
+            $dependencyForCurrentMethod[$dependency]['className'] = $class->getShortName();
             $dependencyForCurrentMethod[$dependency]['type'] = $paramToPropertyMap[$dependency];
+            $dependencyForCurrentMethod[$dependency]['isReturnTypeVoid'] = $isReturnTypeVoid;
             $dependencyForCurrentMethod[$dependency]['methods'][$dependencyMethodCall]['args'][] = []; //@todo parse args fot $this->with(...)
         }
 
@@ -164,6 +178,8 @@ class DependencyFetcher
     }
 
     /**
+     * Get all public methods
+     *
      * @param array $ast
      *
      * @return array
@@ -178,9 +194,9 @@ class DependencyFetcher
     /**
      * @param ClassMethod[] $methods
      *
-     * @return array
+     * @return Node[]
      */
-    private function getCalledDependency(array $methods): array
+    private function getCalledDependencies(array $methods): array
     {
         return $this->nodeFinder->find($methods, function (Node $node) {
             if ($node instanceof MethodCall) {
@@ -203,7 +219,7 @@ class DependencyFetcher
      *
      * @return ClassMethod
      *
-     * @throws \RuntimeException @todo refactor to custom
+     * @throws \RuntimeException
      */
     private function getClassMethodNodeByName($ast, string $methodName): ClassMethod
     {

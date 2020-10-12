@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SmartPHPUnitGenerator;
+namespace SmartPHPUnitTestGenerator;
 
 use PhpParser\BuilderFactory;
 use PhpParser\Node\Expr\Assign;
@@ -12,6 +12,7 @@ use PhpParser\Node\Stmt\Declare_;
 use PhpParser\Node\Stmt\DeclareDeclare;
 use PhpParser\PrettyPrinter\Standard;
 use PHPUnit\Framework\TestCase;
+use SmartPHPUnitTestGenerator\Util\ReturnTypeChecker;
 
 class UnitTestClassRenderer
 {
@@ -55,9 +56,6 @@ class UnitTestClassRenderer
             $methodName = sprintf('test%s', ucfirst($classMethod));
             $testMethod = $this->builderFactory->method($methodName);
 
-            // todo rename
-            $nonUsedDependencies = array_diff_key($paramToPropertyMap, $dependencies);
-
             /**
              * Calculate not used dependencies just for create mock object and inject into a class
              *
@@ -68,25 +66,23 @@ class UnitTestClassRenderer
              *  $mockWithCallMethod->expects($this->once())->method('methodName')->willReturn('someResult');
              *
              *  $service = new Service($mockWithoutCallMethod, $mockWithCallMethod);
-             *  ...
-             *  ...
              */
+            $nonUsedDependencies = array_diff_key($paramToPropertyMap, $dependencies);
+            /** @var \ReflectionClass $type */
             foreach ($nonUsedDependencies as $nonUsedDependency => $type) {
                 $mock = $this->builderFactory->var(sprintf('%sMock', $nonUsedDependency));
-                $namespaceParts = explode('\\', $type);
-                $createMock = $this->prepareCreateMock(end($namespaceParts));
+                $createMock = $this->prepareCreateMock($type->getShortName());
 
                 $testMethod->addStmt(new Assign($mock, $createMock));
 
                 if (!\array_key_exists($type, $useNodes)) {
-                    $useNodes[$type] = $this->builderFactory->use($type)->getNode();
+                    $useNodes[$type->getName()] = $this->builderFactory->use($type->getName())->getNode();
                 }
             }
 
             foreach ($dependencies as $dependencyClass => $attributes) {
                 $mock = $this->builderFactory->var(sprintf('%sMock', $dependencyClass));
-                $namespaceParts = explode('\\', $attributes['type']);
-                $createMock = $this->prepareCreateMock(end($namespaceParts));
+                $createMock = $this->prepareCreateMock($attributes['className']);
 
                 $testMethod->addStmt(new Assign($mock, $createMock));
 
@@ -97,8 +93,12 @@ class UnitTestClassRenderer
                     }
 
                     $mockedMethod = $this->builderFactory->methodCall($mock, 'method', [$method]);
-                    $willReturn = $this->builderFactory->methodCall($mockedMethod, 'willReturn', []);
-                    $testMethod->addStmt($willReturn);
+                    if (!$attributes['isReturnTypeVoid']) {
+                        $willReturn = $this->builderFactory->methodCall($mockedMethod, 'willReturn', []);
+                        $testMethod->addStmt($willReturn);
+                    } else {
+                        $testMethod->addStmt($mockedMethod);
+                    }
                 }
 
                 if (!\array_key_exists($attributes['type'], $useNodes)) {
@@ -106,26 +106,23 @@ class UnitTestClassRenderer
                 }
             }
 
-            $args = array_map(function (string $varName): Variable {
-                return $this->builderFactory->var(sprintf('%sMock', $varName));
-            }, array_keys($paramToPropertyMap));
-
             /**
              * Create class for test
              *
              * $service = new Service($mockWithoutCallMethod, $mockWithCallMethod);
-             * $result = $serives->someMethod($args);
-             *
-             * @todo Or without $result var if method will return void
+             * $result = $service->someMethod($args);
              */
+            $args = $this->prepareMockVars(array_keys($paramToPropertyMap));
             $varForTestClass = $this->builderFactory->var(lcfirst($reflectionClass->getShortName()));
             $classForTest = $this->builderFactory->new($reflectionClass->getShortName(), $args);
             $testMethod->addStmt(new Assign($varForTestClass, $classForTest));
 
             $callMethod = $this->builderFactory->methodCall($varForTestClass, $classMethod);
-            $resultVar = $this->builderFactory->var('result');
 
-            $testMethod->addStmt(new Assign($resultVar, $callMethod));
+            if (!ReturnTypeChecker::isReturnTypeVoid($reflectionClass->getMethod($classMethod))) {
+                $resultVar = $this->builderFactory->var('result');
+                $testMethod->addStmt(new Assign($resultVar, $callMethod));
+            }
 
             $classMethods[] = $testMethod->getNode();
         }
@@ -138,6 +135,18 @@ class UnitTestClassRenderer
         $result[] = $this->builderFactory->class($className)->extend('TestCase')->addStmts($classMethods)->getNode();
 
         return $this->codePrinter->prettyPrintFile($result);
+    }
+
+    /**
+     * @param array $vars
+     *
+     * @return array
+     */
+    private function prepareMockVars(array $vars): array
+    {
+        return array_map(function (string $varName): Variable {
+            return $this->builderFactory->var(sprintf('%sMock', $varName));
+        }, $vars);
     }
 
     /**

@@ -7,10 +7,10 @@ use PhpParser\BuilderFactory;
 use PhpParser\NodeFinder;
 use PhpParser\ParserFactory;
 use PhpParser\PrettyPrinter\Standard;
-use SmartPHPUnitGenerator\DependencyFetcher;
-use SmartPHPUnitGenerator\DependencyPropertyMapper;
-use SmartPHPUnitGenerator\SmartPHPUnitTestGenerator;
-use SmartPHPUnitGenerator\UnitTestClassRenderer;
+use SmartPHPUnitTestGenerator\DependencyFetcher;
+use SmartPHPUnitTestGenerator\DependencyPropertyMapper;
+use SmartPHPUnitTestGenerator\SmartPHPUnitTestGenerator;
+use SmartPHPUnitTestGenerator\UnitTestClassRenderer;
 
 $autoloadFiles = [
     getcwd() . '/vendor/autoload.php',
@@ -35,4 +35,4 @@ $parserFactory = new ParserFactory();
     $dependencyFetcher,
     $unitTestClassRenderer,
     $parserFactory
-))->generate($argv[1], $argv[2]);
+))->generate($argv[1], $argv[2], isset($argv[3]) && $argv[3] === '--rewrite');
