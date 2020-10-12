@@ -75,7 +75,7 @@ class UnitTestClassRenderer
 
                 $testMethod->addStmt(new Assign($mock, $createMock));
 
-                if (!\array_key_exists($type, $useNodes)) {
+                if (!\array_key_exists($type->getName(), $useNodes)) {
                     $useNodes[$type->getName()] = $this->builderFactory->use($type->getName())->getNode();
                 }
             }
@@ -118,10 +118,11 @@ class UnitTestClassRenderer
             $testMethod->addStmt(new Assign($varForTestClass, $classForTest));
 
             $callMethod = $this->builderFactory->methodCall($varForTestClass, $classMethod);
-
             if (!ReturnTypeChecker::isReturnTypeVoid($reflectionClass->getMethod($classMethod))) {
                 $resultVar = $this->builderFactory->var('result');
                 $testMethod->addStmt(new Assign($resultVar, $callMethod));
+            } else {
+                $testMethod->addStmt($callMethod);
             }
 
             $classMethods[] = $testMethod->getNode();
@@ -140,7 +141,7 @@ class UnitTestClassRenderer
     /**
      * @param array $vars
      *
-     * @return array
+     * @return Variable[]
      */
     private function prepareMockVars(array $vars): array
     {

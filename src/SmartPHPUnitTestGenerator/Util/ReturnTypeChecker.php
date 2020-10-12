@@ -13,6 +13,6 @@ class ReturnTypeChecker
      */
     public static function isReturnTypeVoid(\ReflectionMethod $method): bool
     {
-        return $method->getReturnType() === 'void';
+        return $method->getReturnType()->getName() === 'void';
     }
 }
