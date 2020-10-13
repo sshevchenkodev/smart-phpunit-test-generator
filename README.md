@@ -2,8 +2,7 @@
 
 # Install
 ``` bash
-composer config repositories.smart-phpunit-test-generator vcs https://github.com/sshevchenkodev/smart-phpunit-test-generator.git  
-composer install
+composer require sshevchenkodev/smart-phpunit-test-generator
 ```
 
 # How to use
